@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>リアルタイム表情分析</title>
+    <style>
+        #video-container { position: relative; width: 400px; }
+        video { width: 100%; border-radius: 10px; }
+        #emotion-display { font-size: 24px; font-weight: bold; color: #ff4b4b; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h2>AI表情分析チャット (リアルタイム版)</h2>
+    <div id="video-container">
+        <video id="webcam" autoplay playsinline></video>
+    </div>
+    <div id="emotion-display">感情を分析中...</div>
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <script src="script.js"></script>
+</body>
+</html>

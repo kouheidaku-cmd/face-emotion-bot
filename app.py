@@ -1,6 +1,6 @@
-import streamlit as st
-import google.generativeai as genai
-from deepface import DeepFace
+import streamlit as st#WebUIを構築するためのフレームワーク
+import google.generativeai as genai#geminiを利用するためのライブラリ
+from deepface import DeepFace#顔認証を行うライブラリ
 from PIL import Image
 import numpy as np
 import cv2
@@ -9,22 +9,23 @@ import cv2
 genai.configure(api_key="AIzaSyChKRqmEi2qf_NQjFFJEzkpybpgY25xsPg")
 model = genai.GenerativeModel('models/gemini-2.5-flash')
 
-st.title("表情分析AIチャットボット (DeepFace版)")
+st.title("表情分析AIチャットボット (DeepFace版)")#見出しの生成
 
-# 会話履歴の保持
+# 会話履歴の保持、streamlitは何か操作あるたびにコードを再実行してしまうのでそれによって会話の履歴が消去されないように
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # ---------------------------- 2. UI / カメラ入力 ----------------------------
 img_file = st.camera_input("今のあなたの表情を撮ってください")
+#このコードだけでカメラのプレビュー画面、「take photo」ボタン、「clear photo」ボタンが出てくる
 
 # ---------------------------- 3. DeepFace解析 ----------------------------
 detected_emotion = "不明"
 
 if img_file is not None:
-    # Streamlitの画像をOpenCV形式に変換
+    # Streamlitの画像DeepFaceが読み込めるようにOpenCV形式に変換
     img = Image.open(img_file)
-    frame = np.array(img)
+    frame = np.array(img)#数値データに変換
     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR) # OpenCVはBGR
 
     with st.spinner('感情を解析中...'):

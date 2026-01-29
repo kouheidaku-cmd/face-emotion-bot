@@ -2,7 +2,7 @@
 .venv/
 venv/
 ENV/
-env/
+.env/
 
 # Pythonのキャッシュ
 __pycache__/

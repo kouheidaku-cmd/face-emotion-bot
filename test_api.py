@@ -1,7 +1,11 @@
 import google.generativeai as genai
+from dotenv import load_dotenv
+import os
 
 # あなたのAPIキーに書き換えてください
-genai.configure(api_key="AIzaSyChKRqmEi2qf_NQjFFJEzkpybpgY25xsPg")
+load_dotenv() # .envファイルを読み込む
+API_KEY = os.getenv("GEMINI_API_KEY")
+genai.configure(api_key=API_KEY)
 
 try:
     # モデル名をフルパス形式で試す

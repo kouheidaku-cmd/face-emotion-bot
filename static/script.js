@@ -1,5 +1,5 @@
-const video = document.getElementById('webcam');//index.htmlのid=webcam要素を取得
-const canvas = document.getElementById('canvas');
+const video = document.getElementById('webcam');//index.htmlのid=webcam要素を取得,ビデオ本体
+const canvas = document.getElementById('canvas');//pythonサーバに送信する画像データの一時保管用キャンバス
 const display = document.getElementById('emotion-display');
 const context = canvas.getContext('2d');//キャンバスの2Dコンテキストを取得
 
@@ -7,7 +7,7 @@ const context = canvas.getContext('2d');//キャンバスの2Dコンテキスト
 async function startWebcam() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        video.srcObject = stream;
+        video.srcObject = stream;//カメラで撮影される映像streamをvideoのsrcObjectに設定
     } catch (err) {
         console.error("カメラの起動に失敗しました: ", err);
     }
@@ -19,9 +19,11 @@ const socket = new WebSocket('ws://localhost:8000/ws/analyze');
 
 socket.onmessage = (event) => {//サーバーからメッセージ(判定された感情)を受信したときの処理
     const data = JSON.parse(event.data);
-    if (data.status === "success") {
+    if (data.status === "emotion_result") {//サーバーからメッセージ(判定された感情)を受信したときの処理
         display.innerText = "あなたの感情： " + data.emotion;
     }
+    if (data.status==="chat_response"){//サーバーからgeminiの返答を受信したときの処理
+        alert("AIからの返信:"+data.value)}
 };
 
 // 3. 一定間隔で画像をキャプチャしてサーバーに送る
@@ -36,11 +38,28 @@ function sendFrame() {
         
         // 画像をBase64文字列に変換して送信
         const imageData = canvas.toDataURL('image/jpeg', 0.5); // 0.5は画質（軽量化）
-        socket.send(imageData);
+        const data={
+            type:"image",
+            value:imageData
+        };
+        socket.send(JSON.stringify(data));//dataをjson形式{ "type": "chat", "value": "こんにちは" }に変換
     }
+}
+
+//ボタンを押してチャット送信
+function buttonClick(){
+    const chatInput=document.getElementById("chat_input");
+    const data={
+        type:"chat",
+        value:chatInput.value
+    }
+    socket.send(JSON.stringify(data));
+    chatInput.value = ""; // index側の入力欄を空にする
 }
 
 // 0.5秒ごとに画像を送信
 startWebcam().then(() => {
     setInterval(sendFrame, 500); 
 });
+const sendButton=document.getElementById("send_button");//htmlの送信ボタン要素を取得
+sendButton.addEventListener("click",buttonClick);

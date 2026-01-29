@@ -7,8 +7,22 @@ from fastapi.responses import FileResponse # 追加：ファイルを返すた�
 from deepface import DeepFace
 import json
 import uvicorn
+import google.generativeai as genai#geminiを利用するためのライブラリ
+from dotenv import load_dotenv
+import os
+from pathlib import Path
 
 app = FastAPI()
+
+
+# ---------------------------- 1. 設定 ----------------------------
+current_dir = Path(__file__).parent.absolute()
+env_path = current_dir / ".env"
+load_dotenv(dotenv_path=env_path)
+API_KEY = os.getenv("GEMINI_API_KEY")
+genai.configure(api_key=API_KEY)
+model = genai.GenerativeModel('models/gemini-2.5-flash')
+
 
 # 感情マップ
 EMOTION_DICT = {
@@ -34,26 +48,44 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     print("Client connected")
     try:
-        while True:#一回websocketで接続したら無限ループで常に待ち受ける
-            data = await websocket.receive_text()#script.js側で画像データはテキストデータに変換されてる
-            
-            # JSON形式で送られてくる場合を想定（chat機能追加を見据えて）
-            # もし画像URLだけ送るなら今のままでOKですが、エラー回避のためtryで囲みます
-            try:
-                encoded_data = data.split(',')[1]#送られてきたテキストデータを画像データに戻す
-                nparr = np.frombuffer(base64.b64decode(encoded_data), np.uint8)
-                frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        detected_emotion="不明"
 
-                results = DeepFace.analyze(frame, actions=['emotion'], enforce_detection=False)
-                emotion_en = results[0]['dominant_emotion']
-                
-                #script.js側に結果を返信
+        while True:#一回websocketで接続したら無限ループで常に待ち受ける
+            raw_data = await websocket.receive_text()#script.js側で画像データはテキストデータに変換されてる
+            data=json.loads(raw_data)#JSON形式のテキストデータを辞書型に変換
+            if data["type"]=="image":
+                # JSON形式で送られてくる場合を想定（chat機能追加を見据えて）
+                try:
+                    #print("Image received for emotion analysis")
+                    encoded_data = data["value"].split(',')[1]#送られてきたテキストデータを画像データに戻す
+                    nparr = np.frombuffer(base64.b64decode(encoded_data), np.uint8)
+                    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+                    results = DeepFace.analyze(frame, actions=['emotion'], enforce_detection=False)
+                    emotion_en = results[0]['dominant_emotion']
+                    detected_emotion = EMOTION_DICT.get(emotion_en, emotion_en)
+                    #script.js側に結果を返信
+                    await websocket.send_text(json.dumps({
+                        "status": "emotion_result",
+                        "emotion": EMOTION_DICT.get(emotion_en, emotion_en)
+                    }))
+                except Exception:
+                    continue 
+            elif data["type"]=="chat":
+                user_message=data["value"]
+                print(f"Chat message received: {user_message}")
+                prompt = (
+                            f"あなたは親友です。相手は今「{detected_emotion}」という表情をしています。"
+                            f"この感情を考慮して、フランクな日本語で返答してください。\n"
+                            f"ユーザー：{user_message}"
+                        )
+                # ここでGemini APIを呼び出して応答を生成（擬似コード）
+                response= model.generate_content(prompt)
+                #ブラウザにgeminiの返答を送信
                 await websocket.send_text(json.dumps({
-                    "status": "success",
-                    "emotion": EMOTION_DICT.get(emotion_en, emotion_en)
+                    "status":"chat_response",
+                    "value":response.text
                 }))
-            except Exception:
-                continue 
     except Exception as e:
         print(f"Disconnected: {e}")
 

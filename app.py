@@ -4,9 +4,13 @@ from deepface import DeepFace#顔認証を行うライブラリ
 from PIL import Image
 import numpy as np
 import cv2
+from dotenv import load_dotenv
+import os
 
 # ---------------------------- 1. 設定 ----------------------------
-genai.configure(api_key="AIzaSyChKRqmEi2qf_NQjFFJEzkpybpgY25xsPg")
+load_dotenv() # .envファイルを読み込む
+API_KEY = os.getenv("GEMINI_API_KEY")
+genai.configure(api_key=API_KEY)
 model = genai.GenerativeModel('models/gemini-2.5-flash')
 
 st.title("表情分析AIチャットボット (DeepFace版)")#見出しの生成

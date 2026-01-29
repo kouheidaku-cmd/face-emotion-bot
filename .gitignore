@@ -1,0 +1,23 @@
+# 仮想環境（絶対にあげてはいけない）
+.venv/
+venv/
+ENV/
+env/
+
+# Pythonのキャッシュ
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OSの設定ファイル
+.DS_Store
+Thumbs.db
+
+# DeepFaceやモデルの重みファイル（サイズが大きいため）
+.deepface/
+weights/
+*.h5
+*.pb
+
+# 環境変数（APIキーなどを書く予定なら必須）
+.env

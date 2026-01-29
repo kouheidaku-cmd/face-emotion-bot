@@ -1,6 +1,7 @@
 const video = document.getElementById('webcam');//index.htmlのid=webcam要素を取得,ビデオ本体
 const canvas = document.getElementById('canvas');//pythonサーバに送信する画像データの一時保管用キャンバス
-const display = document.getElementById('emotion-display');
+const emotion = document.getElementById('emotion-display');//htmlの感情表示要素を取得
+const message=document.getElementById("chat_response"); //htmlのチャット返信表示要素を取得
 const context = canvas.getContext('2d');//キャンバスの2Dコンテキストを取得
 
 //カメラを起動する関数
@@ -20,10 +21,11 @@ const socket = new WebSocket('ws://localhost:8000/ws/analyze');
 socket.onmessage = (event) => {//サーバーからメッセージ(判定された感情)を受信したときの処理
     const data = JSON.parse(event.data);
     if (data.status === "emotion_result") {//サーバーからメッセージ(判定された感情)を受信したときの処理
-        display.innerText = "あなたの感情： " + data.emotion;
+        emotion.innerText = "あなたの感情： " + data.emotion;//emotion要素のテキストを更新
     }
     if (data.status==="chat_response"){//サーバーからgeminiの返答を受信したときの処理
-        alert("AIからの返信:"+data.value)}
+        message.innerText = "AIからの返信: " + data.value;//message要素のテキストを更新
+    }
 };
 
 // 3. 一定間隔で画像をキャプチャしてサーバーに送る

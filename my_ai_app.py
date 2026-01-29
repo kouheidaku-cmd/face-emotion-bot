@@ -78,6 +78,8 @@ async def websocket_endpoint(websocket: WebSocket):
                             f"あなたは親友です。相手は今「{detected_emotion}」という表情をしています。"
                             f"この感情を考慮して、フランクな日本語で返答してください。\n"
                             f"ユーザー：{user_message}"
+                            f"ただし、会話の流れをスムーズにするため返答の生成はできるだけ早く行ってください。"
+                            f"また、話し言葉を想定し箇条書きなどは控え、30字以内に抑えてください"
                         )
                 # ここでGemini APIを呼び出して応答を生成（擬似コード）
                 response= model.generate_content(prompt)

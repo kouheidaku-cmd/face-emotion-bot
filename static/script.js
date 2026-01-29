@@ -1,7 +1,7 @@
 const video = document.getElementById('webcam');//index.htmlのid=webcam要素を取得,ビデオ本体
 const canvas = document.getElementById('canvas');//pythonサーバに送信する画像データの一時保管用キャンバス
 const emotion = document.getElementById('emotion-display');//htmlの感情表示要素を取得
-const message=document.getElementById("chat_response"); //htmlのチャット返信表示要素を取得
+const chatLog=document.getElementById("chat-log"); //htmlのチャット返信表示要素を取得
 const context = canvas.getContext('2d');//キャンバスの2Dコンテキストを取得
 
 //カメラを起動する関数
@@ -24,7 +24,15 @@ socket.onmessage = (event) => {//サーバーからメッセージ(判定され�
         emotion.innerText = "あなたの感情： " + data.emotion;//emotion要素のテキストを更新
     }
     if (data.status==="chat_response"){//サーバーからgeminiの返答を受信したときの処理
-        message.innerText = "AIからの返信: " + data.value;//message要素のテキストを更新
+        const li = document.createElement("li");//新しいリストアイテム要素を作成
+        li.style.marginBottom="10px";//リストアイテムの下に余白を追加
+        li.innerHTML=`<strong>AI:</strong> ${data.value}`;//リストアイテムの内容を設定
+        //alert(data.value);
+        chatLog.appendChild(li);
+
+        // 自動で一番下までスクロールさせる
+        const container = document.getElementById('chat-container');
+        container.scrollTop = container.scrollHeight;
     }
 };
 

@@ -11,6 +11,7 @@ from openai import OpenAI # OpenAIを利用するためのライブラリに変�
 from dotenv import load_dotenv
 import os
 from pathlib import Path
+from fastapi.staticfiles import StaticFiles # これを追加
 
 app = FastAPI()
 
@@ -18,6 +19,8 @@ app = FastAPI()
 current_dir = Path(__file__).parent.absolute()
 env_path = current_dir / ".env"
 load_dotenv(dotenv_path=env_path)
+# 💡 これを追加！ staticフォルダをブラウザから見えるようにする
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # OpenAI用の設定
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) 
@@ -73,30 +76,28 @@ async def websocket_endpoint(websocket: WebSocket):
                 
                 # OpenAI用のプロンプト組み立て
                 prompt = (
-                            f"あなたは親友です。相手は今「{detected_emotion}」という表情をしています。"
-                            f"この感情を考慮して、フランクな日本語で返答してください。\n"
-                            f"ユーザー：{user_message}"
-                            f"ただし、会話の流れをスムーズにするため返答の生成はできるだけ早く行ってください。"
-                            f"また、話し言葉を想定し箇条書きなどは控え、30字以内に抑えてください"
+                            f"あなたは感情豊かな１０代の女性です。相手は今「{detected_emotion}」という表情をしています。\n"
+                            f"ユーザー：{user_message}\n"
+                            "ただし、会話の流れをスムーズにするため返答の生成はできるだけ早く行ってください。\n"
+                            "また、話し言葉を想定し箇条書きなどは控え、30字以内に抑えてください\n"
+                            "以下のJSON形式で返答してください：\n"
+                            "{ \"reply\": \"30字以内の返答\", \"ai_emotion\": \"喜び/悲しみ/驚き/自然体/怒り/嫌悪/恐れ\" }\n" 
                         )
 
                 # OpenAI APIを呼び出して応答を生成
                 response = client.chat.completions.create(
                     model=MODEL_NAME,
-                    messages=[
-                        {"role": "system", "content": "あなたは親切でフランクな親友です。"},
-                        {"role": "user", "content": prompt}
-                    ],
-                    max_tokens=50 # 30字程度なので制限して節約
+                    messages=[{"role": "user", "content": prompt}],
+                    response_format={"type": "json_object"}
                 )
                 
-                ai_response = response.choices[0].message.content
-                print(f"OpenAI response: {ai_response}")
-                
+                response_json=json.loads(response.choices[0].message.content)
+                print(f"AI Response: {response_json}")
                 # ブラウザに返答を送信
                 await websocket.send_text(json.dumps({
                     "status":"chat_response",
-                    "value":ai_response
+                    "reply":response_json["reply"],
+                    "ai_emotion":response_json["ai_emotion"]
                 }))
     except Exception as e:
         print(f"Disconnected: {e}")

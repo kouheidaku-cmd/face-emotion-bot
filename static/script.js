@@ -3,6 +3,8 @@ const canvas = document.getElementById('canvas');//pythonサーバに送信す�
 const emotion = document.getElementById('emotion-display');//htmlの感情表示要素を取得
 const chatLog=document.getElementById("chat-log"); //htmlのチャット返信表示要素を取得
 const context = canvas.getContext('2d');//キャンバスの2Dコンテキストを取得
+const aiFace=document.getElementById("ai-face");
+const aiStatus=document.getElementById("ai-status");
 
 //カメラを起動する関数
 async function startWebcam() {
@@ -26,13 +28,35 @@ socket.onmessage = (event) => {//サーバーからメッセージ(判定され�
     if (data.status==="chat_response"){//サーバーからgeminiの返答を受信したときの処理
         const li = document.createElement("li");//新しいリストアイテム要素を作成
         li.style.marginBottom="10px";//リストアイテムの下に余白を追加
-        li.innerHTML=`<strong>AI:</strong> ${data.value}`;//リストアイテムの内容を設定
-        //alert(data.value);
-        chatLog.appendChild(li);
+        li.innerHTML=`<strong>AI:</strong> ${data.reply}`;//リストアイテムの内容を設定
 
-        // 自動で一番下までスクロールさせる
-        const container = document.getElementById('chat-container');
-        container.scrollTop = container.scrollHeight;
+        chatLog.appendChild(li);
+        
+
+        //AIの表情を変換
+        const aiEmotion=data.ai_emotion;
+        if(aiEmotion==="喜び"){
+            aiFace.src="static/character/happy.png";
+            aiStatus.innerText="AIの状態: 喜び";
+        }else if(aiEmotion==="悲しみ"){ 
+            aiFace.src="static/character/sad.png";
+            aiStatus.innerText="AIの状態: 悲しみ";
+        }else if(aiEmotion==="驚き"){
+            aiFace.src="static/character/surprised.png";
+            aiStatus.innerText="AIの状態: 驚き";
+        }else if(aiEmotion==="怒り"){
+            aiFace.src="static/character/angry.png";
+            aiStatus.innerText="AIの状態: 怒り";
+        }else if(aiEmotion==="嫌悪"){               
+            aiFace.src="static/character/disgusted.png";
+            aiStatus.innerText="AIの状態: 嫌悪";
+        }else if(aiEmotion==="恐れ"){               
+            aiFace.src="static/character/fearful.png";
+            aiStatus.innerText="AIの状態: 恐れ";
+        }else{ //自然体などその他
+            aiFace.src="static/character/neutral.png";
+            aiStatus.innerText="AIの状態: 自然体";
+        }
     }
 };
 

@@ -26,12 +26,14 @@ socket.onmessage = (event) => {//サーバーからメッセージ(判定され�
         emotion.innerText = "あなたの感情： " + data.emotion;//emotion要素のテキストを更新
     }
     if (data.status==="chat_response"){//サーバーからgeminiの返答を受信したときの処理
+        //音声の発生
+        speak(data.reply);
+
+        //チャットログに返信を追加
         const li = document.createElement("li");//新しいリストアイテム要素を作成
         li.style.marginBottom="10px";//リストアイテムの下に余白を追加
         li.innerHTML=`<strong>AI:</strong> ${data.reply}`;//リストアイテムの内容を設定
-
         chatLog.appendChild(li);
-        
 
         //AIの表情を変換
         const aiEmotion=data.ai_emotion;
@@ -99,6 +101,23 @@ function enterKeyPress(event){
     if(event.key==="Enter"){
         submitaction();
     }
+}
+
+//音声を発声させる関数
+function speak(text){
+    if(!"speechSynthesis" in window){
+        console.error('このブラウザは音声読み上げに対応していません');
+        return;
+    }
+
+    //すでにしゃべっているのを止める
+    window.speechSynthesis.cancel();
+
+    const utter=new SpeechSynthesisUtterance(text);
+    utter.lang='ja-JP';
+    utter.rate=1.0; //話す速度
+    utter.pitch=2.0; //話す高さ
+    window.speechSynthesis.speak(utter);
 }
 
 // 0.5秒ごとに画像を送信

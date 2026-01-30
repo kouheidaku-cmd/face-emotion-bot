@@ -14,6 +14,7 @@ from pathlib import Path
 from fastapi.staticfiles import StaticFiles # これを追加
 
 app = FastAPI()
+chat_history=[]
 
 # ---------------------------- 1. 設定 ----------------------------
 current_dir = Path(__file__).parent.absolute()
@@ -46,44 +47,21 @@ async def get_js():
 # WebSocket 解析ロジック
 @app.websocket("/ws/analyze")
 async def websocket_endpoint(websocket: WebSocket):
+    global chat_history#globalつけることで外側で定義した変数を使えるようにする
+
     await websocket.accept()
     print("Client connected")
     try:
         #通信が始まって一回目の顔写真の送信の際にモデルの初期設定を行う
         raw_data = await websocket.receive_text()
-        data = json.loads(raw_data)
-        if data["type"]=="image":
-            encoded_data = data["value"].split(',')[1]
-            nparr = np.frombuffer(base64.b64decode(encoded_data), np.uint8)
-            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-            results = DeepFace.analyze(frame, actions=['age','gender','race'], enforce_detection=False)
-            user_age = results[0]['age']
-            user_gender=results[0]['gender']
-            user_race=results[0]['race']
-            print(f"User info - Age: {user_age}, Gender: {user_gender}, Race    : {user_race}")
-
-            # OpenAI用のプロンプト組み立て
-            prompt = (
-                        "あなたが今会話をしているユーザーの情報は以下の通りです。\n"
-                        f"年齢:{user_age}歳、性:{user_gender}、人種:{user_race}\n"
-                        "次にあなた自身のキャラクター設定を行います。\n" \
-                        "あなたはとても感情豊かな10代の女性でユーザーとは仲の良い友人です"
-                    )
-
-            # OpenAI APIを呼び出して応答を生成
-            response = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            print(response)
-
-
-        detected_emotion="不明"
+        first_contact(raw_data)
 
         while True:
+            detected_emotion="不明"
             raw_data = await websocket.receive_text()
             data = json.loads(raw_data)
+
+            #-----------------画像データの処理------------------
             if data["type"]=="image":
                 try:
                     encoded_data = data["value"].split(',')[1]
@@ -100,29 +78,9 @@ async def websocket_endpoint(websocket: WebSocket):
                     }))
                 except Exception:
                     continue 
+            #-----------------チャットデータの処理------------------
             elif data["type"]=="chat":
-                user_message=data["value"]
-                print(f"Chat message received: {user_message}")
-                
-                # OpenAI用のプロンプト組み立て
-                prompt = (
-                            f"相手は今「{detected_emotion}」という表情をしています。\n"
-                            f"ユーザーからのメッセージ：{user_message}\n"
-                            "会話の流れをスムーズにするため返答の生成はできるだけ早く行ってください。\n"
-                            "また、話し言葉を想定し箇条書きなどは控え、30字以内に抑えてください\n"
-                            "以下のJSON形式で返答してください：\n"
-                            "{ \"reply\": \"30字以内の返答\", \"ai_emotion\": \"喜び/悲しみ/驚き/自然体/怒り/嫌悪/恐れ\" }\n" 
-                        )
-
-                # OpenAI APIを呼び出して応答を生成
-                response = client.chat.completions.create(
-                    model=MODEL_NAME,
-                    messages=[{"role": "user", "content": prompt}],
-                    response_format={"type": "json_object"}
-                )
-                
-                response_json=json.loads(response.choices[0].message.content)
-                print(f"AI Response: {response_json}")
+                response_json=make_response(data,detected_emotion)
                 # ブラウザに返答を送信
                 await websocket.send_text(json.dumps({
                     "status":"chat_response",
@@ -131,6 +89,72 @@ async def websocket_endpoint(websocket: WebSocket):
                 }))
     except Exception as e:
         print(f"Disconnected: {e}")
+
+#通信が始まった瞬間の通信,一回目の顔写真の受信の際にモデルの初期設定を行う関数
+def first_contact(raw_data):
+    global chat_history
+    data = json.loads(raw_data)
+    if data["type"]=="image":
+        encoded_data = data["value"].split(',')[1]
+        nparr = np.frombuffer(base64.b64decode(encoded_data), np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        results = DeepFace.analyze(frame, actions=['age','gender','race'], enforce_detection=False)
+        user_age = results[0]['age']
+        user_gender=results[0]['gender']
+        user_race=results[0]['race']
+        print(f"User info - Age: {user_age}, Gender: {user_gender}, Race    : {user_race}")
+
+        #プロンプト組み立て
+        user_content = (
+                    "あなたが今会話をしているユーザーはあなたと仲の良い友人であり、情報は以下の通りです。\n"
+                    f"年齢:{user_age}歳、性:{user_gender}、人種:{user_race}\n"
+                    )
+        f=open('static/character/ai_profile.txt','r',encoding='utf-8')
+        ai_content=f.read()
+        f.close()
+
+        #chat_historyの履歴に最初の初期設定を追加
+        chat_history.append({"role": "system","content":ai_content})
+        chat_history.append({"role": "user", "content": user_content})
+
+
+#チャットデータの返信
+def make_response(data,now_emotion):
+    global chat_history
+    user_message=data["value"]
+    #ユーザーのメッセージ保存
+    chat_history.append({"role":"user","content":f"表情:{now_emotion} {user_message}"})
+    print(f"Chat message received: {user_message}")
+    
+    # OpenAI用のプロンプト組み立て
+    prompt = (
+                f"相手は今「{now_emotion}」という表情をしています。\n"
+                f"ユーザーからのメッセージ：{user_message}\n"
+                "会話の流れをスムーズにするため返答の生成はできるだけ早く行ってください。\n"
+                "また、話し言葉を想定し箇条書きなどは控え、30字以内に抑えてください\n"
+                "以下のJSON形式で返答してください：\n"
+                "{ \"reply\": \"30字以内の返答\", \"ai_emotion\": \"喜び/悲しみ/驚き/自然体/怒り/嫌悪/恐れ\" }\n" 
+            )
+    
+    current_messages = chat_history + [{"role": "user", "content": prompt}]
+
+    # OpenAI APIを呼び出して応答を生成
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=current_messages,#この時履歴も一緒に渡す
+        response_format={"type": "json_object"}
+    )
+    
+    response_json=json.loads(response.choices[0].message.content)
+    print(f"AI Response: {response_json}")
+    #chat_historyの更新
+    chat_history.append({"role":"assistant","content":response_json["reply"]})
+    # 履歴が長くなりすぎるとエラーになるので、初期設定は残して直近10件くらいに絞るのが一般的
+    if len(chat_history) > 11:
+        chat_history = [chat_history[0]] +[chat_history[1]] + chat_history[-10:]
+    return response_json
+
 
 # pythonサーバの立ち上げ
 if __name__ == "__main__":

@@ -14,7 +14,6 @@ from pathlib import Path
 from fastapi.staticfiles import StaticFiles # これを追加
 
 app = FastAPI()
-chat_history=[]
 
 # ---------------------------- 1. 設定 ----------------------------
 current_dir = Path(__file__).parent.absolute()
@@ -47,7 +46,7 @@ async def get_js():
 # WebSocket 解析ロジック
 @app.websocket("/ws/analyze")
 async def websocket_endpoint(websocket: WebSocket):
-    global chat_history#globalつけることで外側で定義した変数を使えるようにする
+    chat_history=[]
 
     await websocket.accept()
     print("Client connected")

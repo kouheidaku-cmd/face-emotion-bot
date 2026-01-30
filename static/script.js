@@ -6,11 +6,20 @@ const context = canvas.getContext('2d');//キャンバスの2Dコンテキスト
 const aiFace=document.getElementById("ai-face");
 const aiStatus=document.getElementById("ai-status");
 
-//カメラを起動する関数
+// カメラを起動する関数
 async function startWebcam() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        video.srcObject = stream;//カメラで撮影される映像streamをvideoのsrcObjectに設定
+        video.srcObject = stream;
+
+        // --- 💡 ここに音声認識の開始を追加 ---
+        // recognition が外側で定義されている前提です
+        if (recognition) {
+            recognition.start();
+            console.log("音声認識を開始しました（ハンズフリーモード）");
+        }
+        // ------------------------------------
+
     } catch (err) {
         console.error("カメラの起動に失敗しました: ", err);
     }
@@ -119,6 +128,34 @@ function speak(text){
     utter.pitch=2.0; //話す高さ
     window.speechSynthesis.speak(utter);
 }
+
+
+//---------------------------------音声入力----------------------------------
+// 音声認識の準備
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const recognition = new SpeechRecognition();
+
+recognition.lang = 'ja-JP';      // 日本語
+recognition.interimResults = false; // 確定した結果だけ受け取る
+recognition.continuous = true;   // 常に聞き続ける
+
+// 音声を認識した時の処理
+recognition.onresult = (event) => {
+    const transcript = event.results[event.results.length - 1][0].transcript.trim();
+    if (transcript) {
+        console.log("認識された声:", transcript);
+        
+        // 入力欄に文字を入れて、そのまま送信関数を呼ぶ
+        const chatInput = document.getElementById("chat-input");
+        chatInput.value = transcript;
+        submitaction(); 
+    }
+};
+
+// エラーや停止時の自動再起動
+recognition.onend = () => {
+    recognition.start(); // 止まったら自動で再開（聞き続けさせる）
+};
 
 // 0.5秒ごとに画像を送信
 startWebcam().then(() => {

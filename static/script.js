@@ -80,9 +80,12 @@ function sendFrame() {
     }
 }
 
-//ボタンを押してチャット送信
-function buttonClick(){
-    const chatInput=document.getElementById("chat_input");
+//ボタンを押してチャット送信の関数
+function submitaction(){
+    const chatInput=document.getElementById("chat-input");
+    if (chatInput.value.trim()===""){
+        return;
+    }
     const data={
         type:"chat",
         value:chatInput.value
@@ -91,9 +94,19 @@ function buttonClick(){
     chatInput.value = ""; // index側の入力欄を空にする
 }
 
+//エンターキーでチャット送信
+function enterKeyPress(event){
+    if(event.key==="Enter"){
+        submitaction();
+    }
+}
+
 // 0.5秒ごとに画像を送信
 startWebcam().then(() => {
     setInterval(sendFrame, 500); 
 });
-const sendButton=document.getElementById("send_button");//htmlの送信ボタン要素を取得
-sendButton.addEventListener("click",buttonClick);
+
+//ボタンを押すことによりチャット送信
+const sendButton=document.getElementById("send-button");//htmlの送信ボタン要素を取得
+sendButton.addEventListener("click",submitaction);
+

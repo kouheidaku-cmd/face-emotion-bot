@@ -49,6 +49,36 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     print("Client connected")
     try:
+        #通信が始まって一回目の顔写真の送信の際にモデルの初期設定を行う
+        raw_data = await websocket.receive_text()
+        data = json.loads(raw_data)
+        if data["type"]=="image":
+            encoded_data = data["value"].split(',')[1]
+            nparr = np.frombuffer(base64.b64decode(encoded_data), np.uint8)
+            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+            results = DeepFace.analyze(frame, actions=['age','gender','race'], enforce_detection=False)
+            user_age = results[0]['age']
+            user_gender=results[0]['gender']
+            user_race=results[0]['race']
+            print(f"User info - Age: {user_age}, Gender: {user_gender}, Race    : {user_race}")
+
+            # OpenAI用のプロンプト組み立て
+            prompt = (
+                        "あなたが今会話をしているユーザーの情報は以下の通りです。\n"
+                        f"年齢:{user_age}歳、性:{user_gender}、人種:{user_race}\n"
+                        "次にあなた自身のキャラクター設定を行います。\n" \
+                        "あなたはとても感情豊かな10代の女性でユーザーとは仲の良い友人です"
+                    )
+
+            # OpenAI APIを呼び出して応答を生成
+            response = client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            print(response)
+
+
         detected_emotion="不明"
 
         while True:
@@ -76,9 +106,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 
                 # OpenAI用のプロンプト組み立て
                 prompt = (
-                            f"あなたは感情豊かな１０代の女性です。相手は今「{detected_emotion}」という表情をしています。\n"
-                            f"ユーザー：{user_message}\n"
-                            "ただし、会話の流れをスムーズにするため返答の生成はできるだけ早く行ってください。\n"
+                            f"相手は今「{detected_emotion}」という表情をしています。\n"
+                            f"ユーザーからのメッセージ：{user_message}\n"
+                            "会話の流れをスムーズにするため返答の生成はできるだけ早く行ってください。\n"
                             "また、話し言葉を想定し箇条書きなどは控え、30字以内に抑えてください\n"
                             "以下のJSON形式で返答してください：\n"
                             "{ \"reply\": \"30字以内の返答\", \"ai_emotion\": \"喜び/悲しみ/驚き/自然体/怒り/嫌悪/恐れ\" }\n" 

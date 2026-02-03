@@ -33,6 +33,9 @@ EMOTION_DICT = {
     "happy": "喜び", "sad": "悲しみ", "surprise": "驚き", "neutral": "自然体"
 }
 
+
+chat_history=[]
+
 # 画面を出すための設定
 @app.get("/")
 async def get():
@@ -46,7 +49,6 @@ async def get_js():
 # WebSocket 解析ロジック
 @app.websocket("/ws/analyze")
 async def websocket_endpoint(websocket: WebSocket):
-    chat_history=[]
 
     await websocket.accept()
     print("Client connected")

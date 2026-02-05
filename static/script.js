@@ -7,6 +7,7 @@ const aiFace=document.getElementById("ai-face");
 const aiStatus=document.getElementById("ai-status");
 let currentEmotionImg="/static/character/neutral.png";//グローバル変数でAIの感情画像を保持
 let currentEmotionImg2="/static/character/neutral-2.png";
+let currentEmotionImg3="/static/character/neutral-3.png";
 let mouthInterval=null;//口パクの状態を管理する変数
 let speak_frag=0;
 
@@ -53,30 +54,37 @@ socket.onmessage = (event) => {//サーバーからメッセージ(判定され�
         if(aiEmotion==="喜び"){
             currentEmotionImg="static/character/happy.png";
             currentEmotionImg2="static/character/happy-2.png";
+            currentEmotionImg3="static/character/happy-3.png";
             aiStatus.innerText="AIの状態: 喜び";
         }else if(aiEmotion==="悲しみ"){ 
             currentEmotionImg="static/character/sad.png";
             currentEmotionImg2="static/character/sad-2.png";
+            currentEmotionImg3="static/character/sad-3.png";
             aiStatus.innerText="AIの状態: 悲しみ";
         }else if(aiEmotion==="驚き"){
             currentEmotionImg="static/character/surprised.png";
             currentEmotionImg2="static/character/surprised-2.png";
+            currentEmotionImg3="static/character/surprised-3.png";
             aiStatus.innerText="AIの状態: 驚き";
         }else if(aiEmotion==="怒り"){
             currentEmotionImg="static/character/angry.png";
             currentEmotionImg2="static/character/angry-2.png";
+            currentEmotionImg3="static/character/angry-3.png";
             aiStatus.innerText="AIの状態: 怒り";
         }else if(aiEmotion==="嫌悪"){               
             currentEmotionImg="static/character/disgusted.png";
             currentEmotionImg2="static/character/disgusted-2.png";
+            currentEmotionImg3="static/character/disgusted-3.png";
             aiStatus.innerText="AIの状態: 嫌悪";
         }else if(aiEmotion==="恐れ"){               
             currentEmotionImg="static/character/fearful.png";
             currentEmotionImg2="static/character/fearful-2.png";
+            currentEmotionImg3="static/character/fearful-3.png";
             aiStatus.innerText="AIの状態: 恐れ";
         }else{ //自然体
             currentEmotionImg="static/character/neutral.png";
             currentEmotionImg2="static/character/neutral-2.png";
+            currentEmotionImg3="static/character/neutral-3.png";
             aiStatus.innerText="AIの状態: 自然体";
         }
         aiFace.src=currentEmotionImg
@@ -116,6 +124,8 @@ function submitaction(){
     socket.send(JSON.stringify(data));
     chatInput.value = ""; // index側の入力欄を空にする
 }
+
+
 
 //エンターキーでチャット送信
 function enterKeyPress(event){
@@ -174,12 +184,38 @@ function speak(text) {
         setTimeout(()=>{//プログラムとブラウザのタイムラグを埋める調整
             speak_frag=0;
             console.log("マイク有効");
-        },500);
+        },1000);
     };
 
     window.speechSynthesis.speak(utter);//ここで音声の発話を行う
 }
 
+//瞬きを行う関数
+function startBlinking(){
+    //瞬きを行う感覚をランダムに生成
+    const nextBlinking=Math.random()*3000+3000;
+
+    //nextBlinking後に以下の動作を行う
+    setTimeout(()=>{
+        //AIがしゃべっていないときに瞬きさせる
+        if(!mouthInterval){
+            aiFace.src=currentEmotionImg3;
+            //150ミリ秒後普通の顔に戻す
+            setTimeout(()=>{
+                aiFace.src=currentEmotionImg;
+                startBlinking();
+            },200);
+        }else{
+            startBlinking();
+        }
+    },nextBlinking);
+}
+
+
+// ページ読み込み時にまばたきを開始
+window.onload = () => {
+    startBlinking();
+};
 
 //---------------------------------音声入力----------------------------------
 // 音声認識の準備

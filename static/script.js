@@ -5,6 +5,10 @@ const chatLog=document.getElementById("chat-log"); //htmlのチャット返信�
 const context = canvas.getContext('2d');//キャンバスの2Dコンテキストを取得
 const aiFace=document.getElementById("ai-face");
 const aiStatus=document.getElementById("ai-status");
+let currentEmotionImg="/static/character/neutral.png";//グローバル変数でAIの感情画像を保持
+let currentEmotionImg2="/static/character/neutral-2.png";
+let mouthInterval=null;//口パクの状態を管理する変数
+let speak_frag=0;
 
 // カメラを起動する関数
 async function startWebcam() {
@@ -47,27 +51,35 @@ socket.onmessage = (event) => {//サーバーからメッセージ(判定され�
         //AIの表情を変換
         const aiEmotion=data.ai_emotion;
         if(aiEmotion==="喜び"){
-            aiFace.src="static/character/happy.png";
+            currentEmotionImg="static/character/happy.png";
+            currentEmotionImg2="static/character/happy-2.png";
             aiStatus.innerText="AIの状態: 喜び";
         }else if(aiEmotion==="悲しみ"){ 
-            aiFace.src="static/character/sad.png";
+            currentEmotionImg="static/character/sad.png";
+            currentEmotionImg2="static/character/sad-2.png";
             aiStatus.innerText="AIの状態: 悲しみ";
         }else if(aiEmotion==="驚き"){
-            aiFace.src="static/character/surprised.png";
+            currentEmotionImg="static/character/surprised.png";
+            currentEmotionImg2="static/character/surprised-2.png";
             aiStatus.innerText="AIの状態: 驚き";
         }else if(aiEmotion==="怒り"){
-            aiFace.src="static/character/angry.png";
+            currentEmotionImg="static/character/angry.png";
+            currentEmotionImg2="static/character/angry-2.png";
             aiStatus.innerText="AIの状態: 怒り";
         }else if(aiEmotion==="嫌悪"){               
-            aiFace.src="static/character/disgusted.png";
+            currentEmotionImg="static/character/disgusted.png";
+            currentEmotionImg2="static/character/disgusted-2.png";
             aiStatus.innerText="AIの状態: 嫌悪";
         }else if(aiEmotion==="恐れ"){               
-            aiFace.src="static/character/fearful.png";
+            currentEmotionImg="static/character/fearful.png";
+            currentEmotionImg2="static/character/fearful-2.png";
             aiStatus.innerText="AIの状態: 恐れ";
-        }else{ //自然体などその他
-            aiFace.src="static/character/neutral.png";
+        }else{ //自然体
+            currentEmotionImg="static/character/neutral.png";
+            currentEmotionImg2="static/character/neutral-2.png";
             aiStatus.innerText="AIの状態: 自然体";
         }
+        aiFace.src=currentEmotionImg
     }
 };
 
@@ -113,20 +125,59 @@ function enterKeyPress(event){
 }
 
 //音声を発声させる関数
-function speak(text){
-    if(!"speechSynthesis" in window){
+function speak(text) {
+    if (!window.speechSynthesis) {
         console.error('このブラウザは音声読み上げに対応していません');
         return;
     }
 
-    //すでにしゃべっているのを止める
+    speak_frag=1;//話してる時のfragを上げる
+
+    //今発生している音を中断、ちなみにwindowはブラウザのタブそのものを表すjsの最上位のオブジェクト
     window.speechSynthesis.cancel();
 
-    const utter=new SpeechSynthesisUtterance(text);
-    utter.lang='ja-JP';
-    utter.rate=1.0; //話す速度
-    utter.pitch=2.0; //話す高さ
-    window.speechSynthesis.speak(utter);
+    const resumeInfinity=setInterval(()=>{
+        if (!window.speechSynthesis.speaking){
+            clearInterval(resumeInfinity);
+        }else{
+            window.speechSynthesis.pause();
+            window.speechSynthesis.resume();
+        }
+    },10000);
+
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'ja-JP';
+    utter.rate = 1.0;
+    utter.pitch = 1.5;
+
+    utter.onstart = () => {//utter.onstartという変数に処理そのものを代入、utterが始まった途端start操作を行う
+        console.log("onstart fired");
+        if (mouthInterval) clearInterval(mouthInterval);//mouthIntervalが存在する場合削除
+
+        mouthInterval = setInterval(() => {
+            aiFace.src = aiFace.src.includes(currentEmotionImg)
+                ? currentEmotionImg2
+                : currentEmotionImg;
+        }, 200);
+    };
+
+
+    // 💡 読み上げ終了
+    utter.onend = () => {
+        if (mouthInterval) {
+            clearInterval(mouthInterval);
+            mouthInterval = null;
+        }
+        // 終了時は確実に「閉じ口」に戻す
+        aiFace.src = currentEmotionImg;
+        console.log("口パク終了");
+        setTimeout(()=>{//プログラムとブラウザのタイムラグを埋める調整
+            speak_frag=0;
+            console.log("マイク有効");
+        },500);
+    };
+
+    window.speechSynthesis.speak(utter);//ここで音声の発話を行う
 }
 
 
@@ -141,14 +192,16 @@ recognition.continuous = true;   // 常に聞き続ける
 
 // 音声を認識した時の処理
 recognition.onresult = (event) => {
-    const transcript = event.results[event.results.length - 1][0].transcript.trim();
-    if (transcript) {
-        console.log("認識された声:", transcript);
-        
-        // 入力欄に文字を入れて、そのまま送信関数を呼ぶ
-        const chatInput = document.getElementById("chat-input");
-        chatInput.value = transcript;
-        submitaction(); 
+    if (speak_frag==0){//AIの発話中聞き取り機能オフに
+        const transcript = event.results[event.results.length - 1][0].transcript.trim();
+        if (transcript) {
+            console.log("認識された声:", transcript);
+            
+            // 入力欄に文字を入れて、そのまま送信関数を呼ぶ
+            const chatInput = document.getElementById("chat-input");
+            chatInput.value = transcript;
+            submitaction(); 
+        }
     }
 };
 

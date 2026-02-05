@@ -133,9 +133,10 @@ def make_response(data,now_emotion):
                 f"相手は今「{now_emotion}」という表情をしています。\n"
                 f"ユーザーからのメッセージ：{user_message}\n"
                 "会話の流れをスムーズにするため返答の生成はできるだけ早く行ってください。\n"
-                "また、話し言葉を想定し箇条書きなどは控え、30字以内に抑えてください\n"
+                "また、話し言葉を想定し箇条書きなどは控えてください\n"
                 "以下のJSON形式で返答してください：\n"
-                "{ \"reply\": \"30字以内の返答\", \"ai_emotion\": \"喜び/悲しみ/驚き/自然体/怒り/嫌悪/恐れ\" }\n" 
+                "{ \"reply\": \"返答\", \"ai_emotion\": \"喜び/悲しみ/驚き/自然体/怒り/嫌悪/恐れ\" }\n" 
+                "注意点としてai_emotionには心配は含まれておりません"
             )
     
     current_messages = chat_history + [{"role": "user", "content": prompt}]

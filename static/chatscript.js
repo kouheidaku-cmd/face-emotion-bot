@@ -1,24 +1,21 @@
-const video = document.getElementById('webcam');//index.htmlのid=webcam要素を取得,ビデオ本体
-const canvas = document.getElementById('canvas');//pythonサーバに送信する画像データの一時保管用キャンバス
-const emotion = document.getElementById('emotion-display');//htmlの感情表示要素を取得
-const chatLog=document.getElementById("chat-log"); //htmlのチャット返信表示要素を取得
-const context = canvas.getContext('2d');//キャンバスの2Dコンテキストを取得
-const aiFace=document.getElementById("ai-face");
-const aiStatus=document.getElementById("ai-status");
+//html要素の取得
+const chatLog=document.getElementById("chat-log"); //チャットの履歴の表示欄
+const chatInput=document.getElementById("chat-input");//chatの入力欄
+const sendButton=document.getElementById("send-button");//chatの送信ボタン要素を取得
+const aiFace=document.getElementById("ai-face");//aiの顔
+const aiStatus=document.getElementById("ai-status");//aiの感情
+
+//AIの表情画像のパス管理
 let currentEmotionImg="/static/character/neutral.png";//グローバル変数でAIの感情画像を保持
 let currentEmotionImg2="/static/character/neutral-2.png";
 let currentEmotionImg3="/static/character/neutral-3.png";
+
 let mouthInterval=null;//口パクの状態を管理する変数
-let speak_frag=0;
+let speak_frag=0;//発話のフラッグ
 
-// カメラを起動する関数
-async function startWebcam() {
+// 音声認識を起動する関数
+async function start_listen() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        video.srcObject = stream;
-
-        // --- 💡 ここに音声認識の開始を追加 ---
-        // recognition が外側で定義されている前提です
         if (recognition) {
             recognition.start();
             console.log("音声認識を開始しました（ハンズフリーモード）");
@@ -30,16 +27,16 @@ async function startWebcam() {
     }
 }
 
-//WebSocketの接続設定 (Python側のURLに合わせる)
+
+//1,WebSocketの接続設定 (Python側のURLに合わせる)
 //ウェブブラウザとサーバー間で永続的かつ双方向の通信を可能にする通信プロトコル
-const socket = new WebSocket('ws://localhost:8000/ws/analyze');
+const socket = new WebSocket('ws://localhost:8000/ws/chat');
+
 
 socket.onmessage = (event) => {//サーバーからメッセージ(判定された感情)を受信したときの処理
     const data = JSON.parse(event.data);
-    if (data.status === "emotion_result") {//サーバーからメッセージ(判定された感情)を受信したときの処理
-        emotion.innerText = "あなたの感情： " + data.emotion;//emotion要素のテキストを更新
-    }
-    if (data.status==="chat_response"){//サーバーからgeminiの返答を受信したときの処理
+
+    if (data.status==="chat_response"){//サーバーからAIの返答を受信したときの処理
         //音声の発生
         speak(data.reply);
 
@@ -50,70 +47,33 @@ socket.onmessage = (event) => {//サーバーからメッセージ(判定され�
         chatLog.appendChild(li);
 
         //AIの表情を変換
-        const aiEmotion=data.ai_emotion;
-        if(aiEmotion==="喜び"){
-            currentEmotionImg="static/character/happy.png";
-            currentEmotionImg2="static/character/happy-2.png";
-            currentEmotionImg3="static/character/happy-3.png";
-            aiStatus.innerText="AIの状態: 喜び";
-        }else if(aiEmotion==="悲しみ"){ 
-            currentEmotionImg="static/character/sad.png";
-            currentEmotionImg2="static/character/sad-2.png";
-            currentEmotionImg3="static/character/sad-3.png";
-            aiStatus.innerText="AIの状態: 悲しみ";
-        }else if(aiEmotion==="驚き"){
-            currentEmotionImg="static/character/surprised.png";
-            currentEmotionImg2="static/character/surprised-2.png";
-            currentEmotionImg3="static/character/surprised-3.png";
-            aiStatus.innerText="AIの状態: 驚き";
-        }else if(aiEmotion==="怒り"){
-            currentEmotionImg="static/character/angry.png";
-            currentEmotionImg2="static/character/angry-2.png";
-            currentEmotionImg3="static/character/angry-3.png";
-            aiStatus.innerText="AIの状態: 怒り";
-        }else if(aiEmotion==="嫌悪"){               
-            currentEmotionImg="static/character/disgusted.png";
-            currentEmotionImg2="static/character/disgusted-2.png";
-            currentEmotionImg3="static/character/disgusted-3.png";
-            aiStatus.innerText="AIの状態: 嫌悪";
-        }else if(aiEmotion==="恐れ"){               
-            currentEmotionImg="static/character/fearful.png";
-            currentEmotionImg2="static/character/fearful-2.png";
-            currentEmotionImg3="static/character/fearful-3.png";
-            aiStatus.innerText="AIの状態: 恐れ";
-        }else{ //自然体
-            currentEmotionImg="static/character/neutral.png";
-            currentEmotionImg2="static/character/neutral-2.png";
-            currentEmotionImg3="static/character/neutral-3.png";
-            aiStatus.innerText="AIの状態: 自然体";
-        }
-        aiFace.src=currentEmotionImg
+        updateAiFace(data.ai_emotion);
+        
     }
 };
 
-// 3. 一定間隔で画像をキャプチャしてサーバーに送る
-function sendFrame() {
-    if (socket.readyState === WebSocket.OPEN) {
-        // ビデオのサイズにキャンバスを合わせる
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        
-        // 現在の映像をキャンバスに描画
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        // 画像をBase64文字列に変換して送信
-        const imageData = canvas.toDataURL('image/jpeg', 0.5); // 0.5は画質（軽量化）
-        const data={
-            type:"image",
-            value:imageData
-        };
-        socket.send(JSON.stringify(data));//dataをjson形式{ "type": "chat", "value": "こんにちは" }に変換
-    }
+//2,AIの感情を切り替える関数
+function updateAiFace(ai_emotion){
+    const emotions={
+        "喜び": "happy",
+        "悲しみ": "sad",
+        "驚き": "surprised",
+        "怒り": "angry",
+        "嫌悪": "disgusted",
+        "恐れ": "fearful",
+        "自然体":"neutral"
+    };
+    currentEmotionImg = `/static/character/${emotions[ai_emotion]}.png`;
+    currentEmotionImg2 = `/static/character/${emotions[ai_emotion]}-2.png`;
+    currentEmotionImg3 = `/static/character/${emotions[ai_emotion]}-3.png`;
+
+    aiFace.src=currentEmotionImg
+    aiStatus.innerText=`AIの状態:${ai_emotion}`
 }
 
-//ボタンを押してチャット送信の関数
+
+//3,メッセージ送信関数
 function submitaction(){
-    const chatInput=document.getElementById("chat-input");
     if (chatInput.value.trim()===""){
         return;
     }
@@ -125,8 +85,6 @@ function submitaction(){
     chatInput.value = ""; // index側の入力欄を空にする
 }
 
-
-
 //エンターキーでチャット送信
 function enterKeyPress(event){
     if(event.key==="Enter"){
@@ -134,7 +92,7 @@ function enterKeyPress(event){
     }
 }
 
-//音声を発声させる関数
+//4,音声を発声させる関数
 function speak(text) {
     if (!window.speechSynthesis) {
         console.error('このブラウザは音声読み上げに対応していません');
@@ -190,7 +148,7 @@ function speak(text) {
     window.speechSynthesis.speak(utter);//ここで音声の発話を行う
 }
 
-//瞬きを行う関数
+//5,瞬きを行う関数
 function startBlinking(){
     //瞬きを行う感覚をランダムに生成
     const nextBlinking=Math.random()*3000+3000;
@@ -211,14 +169,12 @@ function startBlinking(){
     },nextBlinking);
 }
 
-
 // ページ読み込み時にまばたきを開始
 window.onload = () => {
     startBlinking();
 };
 
-//---------------------------------音声入力----------------------------------
-// 音声認識の準備
+//6,音声入力を行う関数
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const recognition = new SpeechRecognition();
 
@@ -246,12 +202,9 @@ recognition.onend = () => {
     recognition.start(); // 止まったら自動で再開（聞き続けさせる）
 };
 
-// 0.5秒ごとに画像を送信
-startWebcam().then(() => {
-    setInterval(sendFrame, 500); 
-});
 
 //ボタンを押すことによりチャット送信
-const sendButton=document.getElementById("send-button");//htmlの送信ボタン要素を取得
 sendButton.addEventListener("click",submitaction);
+
+start_listen()
 
